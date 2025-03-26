@@ -1,0 +1,181 @@
+---
+title: "Cyclistic"
+author: "Carlso"
+date: "2025-03-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Cyclistic
+
+Un programa de bicicletas compartidas iniciado en 2016 incluye 5,800 bicicletas y 600 estaciones. Cyclistic se destaca por ofrecer también bicicletas reclinadas, triciclos manuales y bicicletas de carga que ofrecen un uso más inclusivo de las bicicletas compartidas para las personas con discapacidad y los ciclistas que no pueden utilizar una bicicleta estándar de dos ruedas
+
+* La mayoría de los ciclistas eligen las bicicletas tradicionales, alrededor de un 8% de los ciclistas usan las opciones asistidas. 
+* Los usuarios de Cyclistic son más propensos a utilizar la bicicleta para recreación, pero alrededor del 30% la utiliza para ir al trabajo cada día. 
+* 5,824 bicicletas georreferenciadas y bloqueadas en una red de 692 estaciones en toda Chicago. Las bicicletas se pueden desbloquear desde una estación y devolverse en cualquier otra estación del sistema en cualquier momento
+
+Cyclistic se basaba en la construcción de un reconocimiento de marca general y en atraer a amplios segmentos de consumidores. Uno de los enfoques que ayudó a hacer esto posible fue la flexibilidad de sus planes de precios: pases de un solo viaje, pases de un día completo y membresías anuales. A los clientes que compran pases de un solo viaje o pases de un día completo se los llama ciclistas ocasionales. Los clientes que compran membresías anuales se llaman miembros de Cyclistic.
+
+
+![Bike](https://images.unsplash.com/photo-1475666675596-cca2035b3d79?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)
+
+Los analistas financieros de Cyclistic llegaron a la conclusión de que los miembros anuales son mucho más rentables que los ciclistas ocasionales. Aunque la flexibilidad de precios ayuda a Cyclistic a atraer más clientes, Moreno cree que maximizar el número de miembros anuales será clave para el crecimiento futuro. En lugar de crear una campaña de marketing que apunte a todos los clientes nuevos, Moreno cree que hay muchas posibilidades de convertir a los ciclistas ocasionales en miembros. Ella señala que los ciclistas ocasionales ya conocen el programa de Cyclistic y han elegido a Cyclistic para sus necesidades de movilidad.
+
+Moreno estableció una meta clara: Diseñar estrategias de marketing orientadas a convertir a los ciclistas ocasionales en miembros anuales. Sin embargo, para hacer eso, el equipo de analistas de marketing necesita entender mejor cómo difieren los miembros anuales y los ciclistas ocasionales, por qué los ciclistas ocasionales comprarían una membresía y cómo los medios digitales podrían afectar sus tácticas de marketing. Moreno y su equipo están interesados en analizar los datos históricos de viajes en bicicleta de Cyclistic para identificar tendencias.
+
+Datos obtenidos del siguiente sitio <https://divvy-tripdata.s3.amazonaws.com/index.html>
+
+
+Recomendaciones en el analisis
+*1. Análisis de Tiempo de Uso
+*2. Patrones de Uso por Hora o Día de la Semana
+*3. Estaciones de Inicio y Fin Más Populares
+*4. Distancia Recorrida
+
+
+### El analisis se realiza del mes de Febrero de 2025
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+haversine_distance <- function(lat1, lon1, lat2, lon2) {
+  R <- 6371  # Radio de la Tierra en km
+  
+  # Convertir grados a radianes
+  lat1 <- lat1 * pi / 180
+  lon1 <- lon1 * pi / 180
+  lat2 <- lat2 * pi / 180
+  lon2 <- lon2 * pi / 180
+  
+  # Diferencias
+  dlat <- lat2 - lat1
+  dlon <- lon2 - lon1
+  
+  # Fórmula de Haversine
+  a <- sin(dlat / 2)^2 + cos(lat1) * cos(lat2) * sin(dlon / 2)^2
+  c <- 2 * atan2(sqrt(a), sqrt(1 - a))
+  
+  # Distancia en km
+  d <- R * c
+  return(d)
+}
+
+library(tidyverse)
+library(dplyr)
+d12<-read.csv("202502_bike.csv", fileEncoding = "UTF-8")
+colnames(d12)
+d12a<-d12 %>% 
+  drop_na(started_at) %>% 
+  drop_na(ended_at) %>% 
+  mutate(tmi= round(as.numeric(difftime(ended_at,started_at, units = "mins"))) ) %>% 
+  mutate(dlat=abs(end_lat-start_lat)) %>% 
+  mutate(dlng=abs(end_lng-start_lng)) %>% 
+  mutate(distancia =round(1000*(haversine_distance(start_lat, start_lng, end_lat, end_lng))))
+colnames(d12a)
+
+# Se agregan columnas diferencia tiempo, latitud, longitud
+rm(d12)
+#d12b<-d12a
+ggplot(data=d12a)+geom_bar(mapping = aes(x=member_casual,fill=member_casual))+
+  labs(title="Tipo de usuarios")
+num_cas<-count(d12a,member_casual=="member")
+nc<-num_cas[1,2]
+nm<-num_cas[2,2]
+sprintf("De los %i viajes realizados,  %.2f%% [%i] son usuarios casuales y %.2f%% [%i] son miembros",nc+nm,nc/(nc+nm)*100,nc,nm/(nc+nm)*100,nm)
+d12a<-d12a %>% 
+  filter(tmi>=1)
+```
+
+
+Una vez realizado un analisis, respecto al tiempo transcurrido en cada viaje se destaca lo siguiente:
+
+### Datos estadisticos usuarios casuales - tiempo de uso
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Se filtra casual
+d12c<-d12a %>% 
+  filter(member_casual=="casual")
+casual<-summary(d12c$tmi)
+casual[7]<-sd(d12c$tmi)
+names(casual)[7]<-"Stan.Dev"
+#print("Los usuarios casuales tienen la siguiente caracteritica")
+print(casual)
+
+ggplot(data=d12c) + 
+  geom_histogram(mapping=aes(x=tmi), binwidth=2, fill="steelblue", color="black") + 
+  scale_x_continuous(limits=c(0, 100)) +
+  labs(title="Histograma Tiempo por uso", x="minutos", y="Frecuencia") +
+  theme_minimal()
+
+```
+
+### Datos estadisticos usuarios con membresia - tiempo de uso
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Se filtra member
+d12m<-d12a %>% 
+  filter(member_casual=="member")
+miembro<-summary(d12m$tmi)
+miembro[7]<-sd(d12m$tmi)
+names(miembro)[7]<-"Stan.Dev"
+#print("Los usuarios con membresia tienen la siguientes caracteritica")
+print(miembro)
+
+ggplot(data=d12m) + 
+  geom_histogram(mapping=aes(x=tmi), binwidth=2, fill="cyan", color="black") + 
+  scale_x_continuous(limits=c(0, 100)) +
+  labs(title="Histograma Tiempo por uso", x="minutos", y="Frecuencia") +
+  theme_minimal()
+
+```
+
+Tenemos algunos aspectos interesantes al analizar estos datos
+
+*Los usuarios casuales tienen una media más alta y mayor dispersión en sus datos, lo que sugiere que algunos realizan recorridos muy largos.
+
+*Los usuarios con membresía tienen recorridos más consistentes y menos variabilidad, indicando que usan el servicio de forma más estable y predecible.
+
+
+
+### Datos estadisticos usuarios casuales - distancia recorrida
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+  d12c1<-d12c
+d12c<-d12c %>% 
+  drop_na(distancia)
+  
+ggplot(data=d12c) + 
+  geom_histogram(mapping=aes(x=distancia), binwidth=5, fill="steelblue", color="red") +
+  labs(title="Histograma Distancia final recorrida casual", x="metros", y="Frecuencia")
+casual<-summary(d12c$distancia)
+casual[7]<-sd(d12c$distancia)
+names(casual)[7]<-"Stan.Dev"
+#print("Los usuarios casuales tienen la siguiente caracteritica")
+print(casual)
+```
+
+
+
+### Datos estadisticos usuarios membresia - distancia recorrida
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+d12m1<-d12m
+d12m<-d12m %>% 
+  drop_na(distancia)
+
+ggplot(data=d12m) + 
+  geom_histogram(mapping=aes(x=distancia), binwidth=5, fill="steelblue", color="blue") +
+  labs(title="Histograma Distancia final recorrida miembros", x="metros", y="Frecuencia")
+miembro<-summary(d12m$distancia)
+miembro[7]<-sd(d12m$distancia)
+names(miembro)[7]<-"Stan.Dev"
+#print("Los usuarios casuales tienen la siguiente caracteritica")
+print(miembro)
+```
+
+Tenemos algunos aspectos interesantes al analizar estos datos  
+
+* Los usuarios con membresía tienden a recorrer más distancia, lo que podría significar que usan el servicio con más frecuencia o para trayectos más largos.  
+* La variabilidad en miembros es mayor, lo que sugiere que algunos hacen trayectos cortos mientras que otros aprovechan el sistema para viajes largos.  
+* Los valores máximos más altos en miembros indican que este grupo probablemente incluya usuarios que dependen del servicio para viajes extensos.
